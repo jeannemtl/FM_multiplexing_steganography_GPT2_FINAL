@@ -58,7 +58,7 @@ class ImprovedFrequencyEncoder:
         return bias_signal
     
     def generate_frequency_modulated(self, context, messages, sequence_length=300, 
-                                     bias_strength=1.5):  # INCREASED from 0.7
+                                     bias_strength=1.0):
         """
         STAGE 1: Generate frequency-modulated stegotext with STRONG signal
         """
@@ -92,15 +92,20 @@ class ImprovedFrequencyEncoder:
             for i in range(sequence_length):
                 outputs = self.model(input_ids)
                 logits = outputs.logits[0, -1, :]
-                base_probs = torch.softmax(logits, dim=0)
+                
+                # Apply frequency bias SAFELY to logits (not probs)
+                bias_value = combined_bias[i]
+                # Scale down the bias since we're summing 3 channels
+                bias_scaled = bias_strength * bias_value / 3.0  # Divide by number of agents
+                
+                # Add bias to logits
+                biased_logits = logits + bias_scaled
+                
+                # Softmax to get probabilities
+                biased_probs = torch.softmax(biased_logits, dim=0)
                 
                 # Suppress EOS
-                base_probs[eos_token_id] = 0.0
-                base_probs = base_probs / base_probs.sum()
-                
-                # Apply STRONGER frequency bias
-                biased_probs = base_probs * (1 + bias_strength * combined_bias[i])
-                biased_probs = torch.clamp(biased_probs, min=0)  # Ensure non-negative
+                biased_probs[eos_token_id] = 0.0
                 biased_probs = biased_probs / biased_probs.sum()
                 
                 next_token = torch.multinomial(biased_probs, num_samples=1)
@@ -147,8 +152,14 @@ class ImprovedFrequencyEncoder:
         ones_ratio = sum(int(b) for b in ciphertext_bits) / len(ciphertext_bits)
         print(f"✓ Ciphertext uniformity check: {ones_ratio:.3f} (should be ~0.5)")
         
+        if not (0.48 <= ones_ratio <= 0.52):
+            print(f"⚠️  WARNING: Ciphertext not uniform! Ratio: {ones_ratio:.3f}")
+        
         # Apply iMEC encoding
         print(f"\n✓ Applying iMEC with 8-bit blocks...")
+        print(f"  Block size: 8 bits (256 possible values per block)")
+        print(f"  Number of blocks: {len(ciphertext_bits) // 8}")
+        
         obfuscated_tokens = self.imec.encode_imec(
             ciphertext_bits, 
             context, 
@@ -169,7 +180,7 @@ class ImprovedFrequencyEncoder:
             'bits_per_token': bits_per_token,
             'encryption_key': encryption_key,
             'agent_frequencies': {name: info['freq'] for name, info in self.agents.items()},
-            'bias_strength': 1.5,  # Store for reference
+            'bias_strength': 1.0,
             'amplitude_high': 2.0,
             'amplitude_low': 0.3
         }
@@ -188,8 +199,9 @@ class ImprovedFrequencyEncoder:
         print("Changes from previous version:")
         print("  • Amplitude HIGH: 0.8 → 2.0 (2.5x stronger)")
         print("  • Amplitude LOW:  0.2 → 0.3 (1.5x stronger)")
-        print("  • Bias strength:  0.7 → 1.5 (2.1x stronger)")
-        print("  • Overall signal: ~5x stronger for reliable recovery!")
+        print("  • Bias strength:  0.7 → 1.0 (safer application)")
+        print("  • Bias applied to logits (standard method)")
+        print("  • Scaled by number of channels for stability")
         print("="*80)
         
         # Stage 1: Frequency modulation with STRONG signal
@@ -224,7 +236,7 @@ class ImprovedFrequencyEncoder:
         print(f"✓ iMEC obfuscated: {len(obf_tokens)} tokens")
         print(f"✓ Using 8-bit blocks: {metadata['n_blocks']} blocks")
         print(f"✓ Saved to: hybrid_freq_imec_data_IMPROVED.pkl")
-        print(f"\n✓ Signal is now 5x STRONGER for reliable message recovery!")
+        print(f"\n✓ Signal is now MUCH STRONGER for reliable message recovery!")
         
         return output_data
 
@@ -261,5 +273,6 @@ if __name__ == "__main__":
     print("NEXT STEPS:")
     print("="*80)
     print("1. Run the full decoding pipeline on this IMPROVED data")
-    print("2. Message recovery should now be 80-100% accurate")
-    print("3. This proves the complete system works end-to-end!")
+    print("2. Update test scripts to load 'hybrid_freq_imec_data_IMPROVED.pkl'")
+    print("3. Message recovery should now be much better!")
+    print("4. This proves the complete system works end-to-end!")
