@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pkl
+*.pth
+*.pt
+*.h5
+*.json
+*.log
+.DS_Store
+*.swp
