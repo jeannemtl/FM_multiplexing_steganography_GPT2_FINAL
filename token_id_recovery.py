@@ -5,13 +5,16 @@ import pickle
 import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
-class ImprovedMessageRecovery:
+class TokenIDMessageRecovery:
     """
-    Improved message recovery with better demodulation
+    CORRECT APPROACH: FFT on token IDs, not embeddings!
+    
+    The FM bias affects token selection directly, so we should analyze
+    the token ID sequence, not the embedding space.
     """
     
     def __init__(self, model_name='gpt2'):
-        print("Loading GPT-2...")
+        print("Loading GPT-2 for token ID-based recovery...")
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
         self.model = GPT2LMHeadModel.from_pretrained(model_name)
         self.model.eval()
@@ -44,24 +47,21 @@ class ImprovedMessageRecovery:
         
         return recovered_tokens
     
-    def improved_demodulation(self, embeddings, carrier_freq, n_bits, 
-                             sequence_length):
+    def improved_demodulation_on_token_ids(self, token_ids, carrier_freq, n_bits, 
+                                          sequence_length):
         """
-        Improved ASK demodulation with better signal processing
+        Perform FFT analysis directly on TOKEN IDs (not embeddings!)
         """
-        # Average embeddings to get 1D signal
-        signal_1d = np.mean(embeddings, axis=1)
+        # Normalize token IDs to [0, 1] range
+        token_array = np.array(token_ids, dtype=float)
+        token_normalized = (token_array - np.mean(token_array)) / (np.std(token_array) + 1e-10)
         
-        # Normalize signal
-        signal_1d = (signal_1d - np.mean(signal_1d)) / (np.std(signal_1d) + 1e-10)
+        # Bandpass filter around carrier frequency
+        bandwidth = 0.010  # Wider bandwidth
         
-        # Create bandpass filter around carrier frequency
-        # Wider bandwidth for better capture
-        bandwidth = 0.008
-        
-        # FFT
-        fft_result = np.fft.fft(signal_1d)
-        freqs = np.fft.fftfreq(len(signal_1d))
+        # FFT on token IDs
+        fft_result = np.fft.fft(token_normalized)
+        freqs = np.fft.fftfreq(len(token_normalized))
         
         # Bandpass filter
         mask = np.abs(freqs - carrier_freq) < bandwidth
@@ -72,8 +72,8 @@ class ImprovedMessageRecovery:
         analytic = signal.hilbert(filtered_signal)
         envelope = np.abs(analytic)
         
-        # Smooth envelope with larger window
-        window = 15
+        # Smooth envelope
+        window = 20
         envelope_smooth = np.convolve(envelope, np.ones(window)/window, mode='same')
         
         # Normalize envelope
@@ -81,7 +81,7 @@ class ImprovedMessageRecovery:
         if np.max(envelope_smooth) > 0:
             envelope_smooth = envelope_smooth / np.max(envelope_smooth)
         
-        # Decode bits using adaptive thresholding
+        # Decode bits
         tokens_per_bit = sequence_length // n_bits
         decoded_bits = []
         
@@ -98,26 +98,20 @@ class ImprovedMessageRecovery:
         
         return decoded_bits, envelope_smooth, filtered_signal
     
-    def analyze_and_visualize(self, original_tokens, recovered_tokens, data):
+    def analyze_with_token_ids(self, original_tokens, recovered_tokens, data):
         """
-        Comprehensive analysis with better visualization
+        Comprehensive analysis using TOKEN IDs instead of embeddings
         """
         print("\n" + "="*80)
-        print("IMPROVED MESSAGE RECOVERY")
+        print("TOKEN ID-BASED MESSAGE RECOVERY")
+        print("="*80)
+        print("KEY INSIGHT: Analyzing token IDs directly, not embeddings!")
         print("="*80)
         
         # Token comparison
         matches = sum(1 for o, r in zip(original_tokens, recovered_tokens) if o == r)
         token_accuracy = matches / len(original_tokens) * 100
         print(f"\n✓ Token Recovery: {token_accuracy:.1f}% ({matches}/{len(original_tokens)})")
-        
-        # Get embeddings
-        orig_tensor = torch.tensor(original_tokens).unsqueeze(0).to(self.device)
-        rec_tensor = torch.tensor(recovered_tokens).unsqueeze(0).to(self.device)
-        
-        with torch.no_grad():
-            orig_emb = self.model.transformer.wte(orig_tensor).squeeze().cpu().numpy()
-            rec_emb = self.model.transformer.wte(rec_tensor).squeeze().cpu().numpy()
         
         # Message recovery for each agent
         agents = list(data['metadata']['agent_frequencies'].keys())
@@ -126,7 +120,7 @@ class ImprovedMessageRecovery:
         
         results = {}
         
-        fig, axes = plt.subplots(len(agents), 3, figsize=(18, 4*len(agents)))
+        fig, axes = plt.subplots(len(agents), 4, figsize=(20, 4*len(agents)))
         
         for idx, agent in enumerate(agents):
             carrier = agent_freqs[agent]
@@ -135,14 +129,14 @@ class ImprovedMessageRecovery:
             
             print(f"\n{agent} (carrier: {carrier:.3f} Hz):")
             
-            # Try demodulation on ORIGINAL tokens (baseline)
-            orig_decoded, orig_envelope, orig_filtered = self.improved_demodulation(
-                orig_emb, carrier, n_bits, len(original_tokens)
+            # Demodulation on ORIGINAL token IDs
+            orig_decoded, orig_envelope, orig_filtered = self.improved_demodulation_on_token_ids(
+                original_tokens, carrier, n_bits, len(original_tokens)
             )
             
-            # Try demodulation on RECOVERED tokens
-            rec_decoded, rec_envelope, rec_filtered = self.improved_demodulation(
-                rec_emb, carrier, n_bits, len(recovered_tokens)
+            # Demodulation on RECOVERED token IDs
+            rec_decoded, rec_envelope, rec_filtered = self.improved_demodulation_on_token_ids(
+                recovered_tokens, carrier, n_bits, len(recovered_tokens)
             )
             
             # Calculate accuracies
@@ -151,8 +145,8 @@ class ImprovedMessageRecovery:
             rec_accuracy = sum(1 for a, b in zip(original_bits, rec_decoded) 
                              if a == b) / n_bits * 100
             
-            print(f"  Original message:     {original_bits}")
-            print(f"  From original tokens: {orig_decoded} ({orig_accuracy:.1f}%)")
+            print(f"  Original message:      {original_bits}")
+            print(f"  From original tokens:  {orig_decoded} ({orig_accuracy:.1f}%)")
             print(f"  From recovered tokens: {rec_decoded} ({rec_accuracy:.1f}%)")
             
             results[agent] = {
@@ -166,40 +160,49 @@ class ImprovedMessageRecovery:
             # Visualization
             ax = axes[idx] if len(agents) > 1 else axes
             
-            # Plot 1: Filtered signals
-            ax[0].plot(orig_filtered, label='Original tokens', alpha=0.7)
-            ax[0].plot(rec_filtered, label='Recovered tokens', alpha=0.7, linestyle='--')
-            ax[0].set_title(f'{agent}: Filtered Signal ({carrier:.3f} Hz)')
-            ax[0].set_xlabel('Token Position')
-            ax[0].set_ylabel('Amplitude')
+            # Plot 1: Raw token IDs
+            ax[0].plot(original_tokens, label='Original', alpha=0.7, linewidth=0.5)
+            ax[0].plot(recovered_tokens, label='Recovered', alpha=0.7, linewidth=0.5, linestyle='--')
+            ax[0].set_title(f'{agent}: Token ID Sequences')
+            ax[0].set_xlabel('Position')
+            ax[0].set_ylabel('Token ID')
             ax[0].legend()
             ax[0].grid(True, alpha=0.3)
             
-            # Plot 2: Envelopes with bit boundaries
-            ax[1].plot(orig_envelope, label='Original', alpha=0.7)
-            ax[1].plot(rec_envelope, label='Recovered', alpha=0.7, linestyle='--')
+            # Plot 2: Filtered signals
+            ax[1].plot(orig_filtered, label='Original tokens', alpha=0.7)
+            ax[1].plot(rec_filtered, label='Recovered tokens', alpha=0.7, linestyle='--')
+            ax[1].set_title(f'{agent}: Filtered Signal ({carrier:.3f} Hz)')
+            ax[1].set_xlabel('Token Position')
+            ax[1].set_ylabel('Amplitude')
+            ax[1].legend()
+            ax[1].grid(True, alpha=0.3)
+            
+            # Plot 3: Envelopes with bit boundaries
+            ax[2].plot(orig_envelope, label='Original', alpha=0.7)
+            ax[2].plot(rec_envelope, label='Recovered', alpha=0.7, linestyle='--')
             
             # Mark bit boundaries
             tokens_per_bit = len(orig_envelope) // n_bits
             for i in range(n_bits + 1):
-                ax[1].axvline(x=i*tokens_per_bit, color='gray', 
+                ax[2].axvline(x=i*tokens_per_bit, color='gray', 
                             linestyle=':', alpha=0.5)
             
             # Mark bit values
             for i in range(n_bits):
                 mid = (i + 0.5) * tokens_per_bit
-                ax[1].text(mid, 1.1, str(original_bits[i]), 
-                         ha='center', fontweight='bold')
+                ax[2].text(mid, 1.1, str(original_bits[i]), 
+                         ha='center', fontweight='bold', fontsize=9)
             
-            ax[1].set_title(f'{agent}: Envelope Detection')
-            ax[1].set_xlabel('Token Position')
-            ax[1].set_ylabel('Envelope Amplitude')
-            ax[1].legend()
-            ax[1].grid(True, alpha=0.3)
-            ax[1].set_ylim([-0.1, 1.3])
+            ax[2].set_title(f'{agent}: Envelope Detection (Token IDs)')
+            ax[2].set_xlabel('Token Position')
+            ax[2].set_ylabel('Envelope Amplitude')
+            ax[2].legend()
+            ax[2].grid(True, alpha=0.3)
+            ax[2].set_ylim([-0.1, 1.3])
             
-            # Plot 3: Results
-            ax[2].axis('off')
+            # Plot 4: Results
+            ax[3].axis('off')
             result_text = f"""
 {agent} Results:
 
@@ -215,21 +218,24 @@ From Recovered Tokens:
   Accuracy: {rec_accuracy:.1f}%
 
 Token Recovery: {token_accuracy:.1f}%
+
+METHOD: FFT on Token IDs
+(NOT embeddings!)
 """
             color = 'lightgreen' if rec_accuracy > 80 else 'lightyellow' if rec_accuracy > 60 else 'lightcoral'
-            ax[2].text(0.1, 0.5, result_text, fontsize=10, family='monospace',
+            ax[3].text(0.1, 0.5, result_text, fontsize=9, family='monospace',
                       va='center', bbox=dict(boxstyle='round', facecolor=color, alpha=0.5))
         
         plt.tight_layout()
-        plt.savefig('improved_message_recovery.png', dpi=150, bbox_inches='tight')
-        print("\n✓ Saved: improved_message_recovery.png")
+        plt.savefig('token_id_message_recovery.png', dpi=150, bbox_inches='tight')
+        print("\n✓ Saved: token_id_message_recovery.png")
         
         # Summary
         print("\n" + "="*80)
         print("SUMMARY")
         print("="*80)
         print(f"Token Recovery: {token_accuracy:.1f}%")
-        print("\nMessage Recovery:")
+        print("\nMessage Recovery (using TOKEN IDs):")
         for agent, res in results.items():
             print(f"  {agent}:")
             print(f"    From original tokens:  {res['orig_accuracy']:.1f}%")
@@ -240,24 +246,22 @@ Token Recovery: {token_accuracy:.1f}%
         print("DIAGNOSIS")
         print("="*80)
         
-        if token_accuracy > 95:
-            print("✓ Token recovery is excellent (>95%)")
-        else:
-            print(f"⚠️  Token recovery at {token_accuracy:.1f}% - some loss occurred")
-        
         avg_orig_acc = np.mean([r['orig_accuracy'] for r in results.values()])
         avg_rec_acc = np.mean([r['rec_accuracy'] for r in results.values()])
         
-        if avg_orig_acc < 70:
-            print("⚠️  Low accuracy even from ORIGINAL tokens")
-            print("    → Issue: FM modulation signal is too weak")
-            print("    → Solution: Increase bias_strength in encoding")
-        elif avg_rec_acc < avg_orig_acc - 10:
-            print(f"⚠️  Recovered token accuracy ({avg_rec_acc:.1f}%) significantly")
-            print(f"    lower than original ({avg_orig_acc:.1f}%)")
-            print("    → Some information loss in iMEC encode/decode")
+        if avg_orig_acc > 80:
+            print(f"✓ EXCELLENT! Token ID approach works! ({avg_orig_acc:.1f}% from original)")
+            if avg_rec_acc > 80:
+                print(f"✓ Complete pipeline SUCCESS! ({avg_rec_acc:.1f}% from recovered)")
+            else:
+                print(f"⚠️  Token loss during iMEC affected recovery ({avg_rec_acc:.1f}%)")
+        elif avg_orig_acc > 60:
+            print(f"✓ Good progress with token IDs ({avg_orig_acc:.1f}%)")
+            print("   → May need: longer sequences, cleaner carrier separation")
         else:
-            print(f"✓ Message recovery working! Average: {avg_rec_acc:.1f}%")
+            print(f"⚠️  Still low ({avg_orig_acc:.1f}%) even with token IDs")
+            print("   → Issue: Token ID sequence may not capture FM bias well")
+            print("   → Consider: Alternative encoding (direct bit patterns)")
         
         return results
 
@@ -267,7 +271,7 @@ Token Recovery: {token_accuracy:.1f}%
 # ============================================================================
 
 if __name__ == "__main__":
-    analyzer = ImprovedMessageRecovery()
+    analyzer = TokenIDMessageRecovery()
     
     print("Loading data...")
     data, ciphertext = analyzer.load_data()
@@ -279,8 +283,8 @@ if __name__ == "__main__":
         data['metadata']['bits_per_token']
     )
     
-    print("Analyzing and recovering messages...")
-    results = analyzer.analyze_and_visualize(
+    print("Analyzing with TOKEN IDs (not embeddings)...")
+    results = analyzer.analyze_with_token_ids(
         data['freq_tokens'],
         recovered_tokens,
         data

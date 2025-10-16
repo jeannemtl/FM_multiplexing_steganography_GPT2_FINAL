@@ -27,7 +27,7 @@ class IMECDecodeFFTTest:
         self.MAX_CONTEXT = 1024
         self.vocab_size = len(self.tokenizer)
         
-    def load_data(self, pkl_path='hybrid_freq_imec_data.pkl'):
+    def load_data(self, pkl_path='hybrid_freq_imec_data_ULTRA.pkl'):
         """Load the hybrid data"""
         with open(pkl_path, 'rb') as f:
             data = pickle.load(f)
