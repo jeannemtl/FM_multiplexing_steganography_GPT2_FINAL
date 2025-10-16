@@ -9,7 +9,7 @@ Hybrid steganography system combining FM and iterative Minimum Entropy Coupling 
 # 1. Encode (20-30 min)
 python3 ultra_strong_encoder_20bit.py
 
-# 2. Decode (10-15 min)
+# 2. Decode iMEC + Security Analysis (10-15 min)
 python3 imec_security_test5_update.py
 
 # 3. Recover messages (<1 min)
@@ -21,7 +21,7 @@ python3 token_id_recovery.py
 | Block Size | Token Recovery | Message Recovery | Speed |
 |------------|---------------|------------------|-------|
 | 8-bit      | 92.7%         | 56%              | Fast (~2 min) |
-| **20-bit** | **99-100%** | **85-95%**       | Slower (~15 min) |
+| **20-bit** | Pending       | Pending          | Slower        |
 
 **20-bit blocks = Paper's optimal setting (ICLR 2023)**
 
@@ -45,7 +45,7 @@ Messages recovered (85-95% accuracy)
 
 - `imec_encoder.py` - Base iMEC implementation
 - `ultra_strong_encoder_20bit.py` - **Main encoder** (20-bit, paper optimal)
-- `imec_security_test5_update.py` - Decoder
+- `imec_security_test5_update.py` - iMEC decoder + security analysis
 - `token_id_recovery.py` - Message recovery via FFT
 
 ## Critical Settings
