@@ -183,6 +183,9 @@ class MinEntropyCouplingSteganography:
                 entropies = [self._entropy(mu_i) for mu_i in mu]
                 max_entropy = max(entropies)
                 
+                if (j + 1) % 50 == 0:
+                    print(f"  Token {j+1}/{max_tokens}: H_max={max_entropy:.4f}, H_avg={np.mean(entropies):.4f}", flush=True)
+                
                 if max_entropy < entropy_threshold:
                     print(f"\n✓ Stopping: max entropy {max_entropy:.4f} < {entropy_threshold}")
                     break
