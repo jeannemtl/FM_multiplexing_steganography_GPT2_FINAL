@@ -43,12 +43,12 @@ class FrequencyiMECHybridEncoder:
             start = i * tokens_per_bit
             end = min((i + 1) * tokens_per_bit, sequence_length)
             
-            amplitude_target = 0.8 if bit == 1 else 0.2
+            amplitude_target = 1.5 if bit == 1 else 0.3
             window_length = end - start
             amplitude = np.ones(window_length) * amplitude_target
             
             if i > 0:
-                prev_amp = 0.8 if bits[i-1] == 1 else 0.2
+                prev_amp = 1.5 if bits[i-1] == 1 else 0.3
                 for j in range(min(transition_tokens, window_length)):
                     t_norm = j / transition_tokens
                     amplitude[j] = prev_amp * (1 - t_norm) + amplitude_target * t_norm
@@ -60,7 +60,7 @@ class FrequencyiMECHybridEncoder:
         return bias_signal
     
     def generate_frequency_modulated(self, context, messages, sequence_length=300, 
-                                     bias_strength=0.7):
+                                     bias_strength=1.2):
         """
         STAGE 1: Generate frequency-modulated stegotext.
         """

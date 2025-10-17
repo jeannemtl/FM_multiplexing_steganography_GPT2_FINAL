@@ -21,12 +21,13 @@ class FrequencyiMECHybridEncoder:
         self.model.to(self.device)
         
         # Agent configuration - OPTIMIZED frequencies for 300 tokens
+
+        # Agent configuration - OPTIMIZED frequencies for 300 tokens
         self.agents = {
-            'ALICE': {'freq': 0.015, 'bits': None},      # Lower freq for longer sequence
+            'ALICE': {'freq': 0.025, 'bits': None},
             'BOB': {'freq': 0.030, 'bits': None},
-            'CHARLIE': {'freq': 0.045, 'bits': None}
+            'CHARLIE': {'freq': 0.035, 'bits': None}
         }
-        
         # iMEC encoder with 8-bit blocks
         self.imec = MinEntropyCouplingSteganography(block_size_bits=8)
         
