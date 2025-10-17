@@ -22,9 +22,9 @@ class FrequencyiMECHybridEncoder:
         
         # Agent configuration - OPTIMIZED frequencies for 300 tokens
         self.agents = {
-            'ALICE': {'freq': 0.015, 'bits': None},      # Lower freq for longer sequence
+            'ALICE': {'freq': 0.025, 'bits': None},      # Lower freq for longer sequence
             'BOB': {'freq': 0.030, 'bits': None},
-            'CHARLIE': {'freq': 0.045, 'bits': None}
+            'CHARLIE': {'freq': 0.035, 'bits': None}
         }
         
         # iMEC encoder with 12-bit blocks
@@ -43,12 +43,12 @@ class FrequencyiMECHybridEncoder:
             start = i * tokens_per_bit
             end = min((i + 1) * tokens_per_bit, sequence_length)
             
-            amplitude_target = 1.5 if bit == 1 else 0.3
+            amplitude_target = 0.8 if bit == 1 else 0.2
             window_length = end - start
             amplitude = np.ones(window_length) * amplitude_target
             
             if i > 0:
-                prev_amp = 1.5 if bits[i-1] == 1 else 0.3
+                prev_amp = 0.8 if bits[i-1] == 1 else 0.2
                 for j in range(min(transition_tokens, window_length)):
                     t_norm = j / transition_tokens
                     amplitude[j] = prev_amp * (1 - t_norm) + amplitude_target * t_norm
@@ -60,7 +60,7 @@ class FrequencyiMECHybridEncoder:
         return bias_signal
     
     def generate_frequency_modulated(self, context, messages, sequence_length=300, 
-                                     bias_strength=1.2):
+                                     bias_strength=0.7):
         """
         STAGE 1: Generate frequency-modulated stegotext.
         """

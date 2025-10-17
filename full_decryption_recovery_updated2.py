@@ -26,7 +26,7 @@ class ProperFrequencyDemodulation:
     
     def load_data(self):
         """Load all data"""
-        with open('hybrid_freq_imec_data.pkl', 'rb') as f:
+        with open('hybrid_freq_imec_data_10bit.pkl', 'rb') as f:
             data = pickle.load(f)
         with open('recovered_ciphertext.txt', 'r') as f:
             recovered_ciphertext = f.read().strip()

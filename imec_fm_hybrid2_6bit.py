@@ -29,11 +29,11 @@ class FrequencyiMECHybridEncoder:
             'BOB': {'freq': 0.030, 'bits': None},
             'CHARLIE': {'freq': 0.035, 'bits': None}
         }
-        # iMEC encoder with 8-bit blocks
-        self.imec = MinEntropyCouplingSteganography(block_size_bits=8)
+        # iMEC encoder with 6-bit blocks
+        self.imec = MinEntropyCouplingSteganography(block_size_bits=6)
         
         print(f"Hybrid encoder ready on {self.device}")
-        print(f"Using 8-bit iMEC blocks for better convergence")
+        print(f"Using 6-bit iMEC blocks for better convergence")
         print(f"Optimized for 300-token sequences")
     
     def encode_ask_smooth(self, bits, carrier_freq, sequence_length, transition_tokens=5):
@@ -123,7 +123,7 @@ class FrequencyiMECHybridEncoder:
         STAGE 2: Apply iMEC to hide frequency patterns.
         """
         print("\n" + "="*80)
-        print("STAGE 2: iMEC OBFUSCATION (with encryption, 8-bit blocks)")
+        print("STAGE 2: iMEC OBFUSCATION (with encryption, 6-bit blocks)")
         print("="*80)
         
         # Convert frequency tokens to binary (plaintext)
@@ -153,10 +153,10 @@ class FrequencyiMECHybridEncoder:
         if not (0.48 <= ones_ratio <= 0.52):
             print(f"⚠️  WARNING: Ciphertext not uniform! Ratio: {ones_ratio:.3f}")
         
-        # Apply iMEC encoding to UNIFORM ciphertext with 8-bit blocks
-        print(f"\n✓ Applying iMEC with 8-bit blocks...")
-        print(f"  Block size: 8 bits (256 possible values per block)")
-        print(f"  Number of blocks: {len(ciphertext_bits) // 8}")
+        # Apply iMEC encoding to UNIFORM ciphertext with 6-bit blocks
+        print(f"\n✓ Applying iMEC with 6-bit blocks...")
+        print(f"  Block size: 6 bits (64 possible values per block)")
+        print(f"  Number of blocks: {len(ciphertext_bits) // 6}")
         
         obfuscated_tokens = self.imec.encode_imec(
             ciphertext_bits, 
@@ -170,11 +170,11 @@ class FrequencyiMECHybridEncoder:
         print(f"\n✓ iMEC obfuscation complete")
         print(f"✓ Obfuscated to {len(obfuscated_tokens)} tokens")
         
-        # Store metadata INCLUDING encryption key and 8-bit block size
+        # Store metadata INCLUDING encryption key and 6-bit block size
         metadata = {
             'n_freq_tokens': len(freq_tokens),
-            'block_size_bits': 8,
-            'n_blocks': len(ciphertext_bits) // 8,
+            'block_size_bits': 6,
+            'n_blocks': len(ciphertext_bits) // 6,
             'bits_per_token': bits_per_token,
             'encryption_key': encryption_key,
             'agent_frequencies': {name: info['freq'] for name, info in self.agents.items()}
@@ -189,7 +189,7 @@ class FrequencyiMECHybridEncoder:
         Complete hybrid encoding pipeline.
         """
         print("\n" + "="*80)
-        print("HYBRID ENCODER: FREQUENCY + iMEC (8-bit blocks)")
+        print("HYBRID ENCODER: FREQUENCY + iMEC (6-bit blocks)")
         print("="*80)
         
         # Stage 1: Frequency modulation
@@ -214,7 +214,7 @@ class FrequencyiMECHybridEncoder:
             'metadata': metadata
         }
         
-        with open('hybrid_freq_imec_data.pkl', 'wb') as f:
+        with open('hybrid_freq_imec_data_6bit.pkl', 'wb') as f:
             pickle.dump(output_data, f)
         
         print("\n" + "="*80)
@@ -222,8 +222,8 @@ class FrequencyiMECHybridEncoder:
         print("="*80)
         print(f"✓ Frequency-modulated: {len(freq_tokens)} tokens")
         print(f"✓ iMEC obfuscated: {len(obf_tokens)} tokens")
-        print(f"✓ Using 8-bit blocks: {metadata['n_blocks']} blocks")
-        print(f"✓ Saved to: hybrid_freq_imec_data.pkl")
+        print(f"✓ Using 6-bit blocks: {metadata['n_blocks']} blocks")
+        print(f"✓ Saved to: hybrid_freq_imec_data_6bit.pkl")
         
         return output_data
 
